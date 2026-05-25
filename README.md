@@ -142,4 +142,6 @@ mpirun -n 8 python3 01_prep_pywrdrb_inputs.py
 | 2026-05-25 | Repository initialized | — |
 | 2026-05-25 | `pywrdrb/` added from `ms/dissertation` branch | feature/release-policy-refactor + nyc_opt |
 | 2026-05-25 | `cmip6/` scripts added | CMIP6_multimodel_streamflow (Trevor Amestoy) |
-| 2026-05-25 | `run_workflow.sh` updated for cluster module chain | dissertation |
+| 2026-05-25 | `run_workflow.sh` updated: full module chain, dissertation venv path | dissertation |
+| 2026-05-25 | Bug fix: `pywrdrb/pre/extrapolate_nyc_nj_diversions.py:659` — `df_long_m["nn"] = pd.NaT` (was `-1`); newer pandas rejects Timestamp assignment into int64 column | dissertation |
+| 2026-05-25 | Bug fix: venv mpi4py — pip-installed against system OpenMPI (py3-mpi4py module is Python 3.6 only) | dissertation |
