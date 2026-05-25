@@ -2005,3 +2005,186 @@ class VolBalanceNYCDemand(Parameter):
         )
 ### have to register the custom parameter so Pywr recognizes it
 VolBalanceNYCDemand.register()
+
+
+class LowerBasinDroughtLevel(Parameter):
+    """
+    Determines the Lower Basin (LB) drought operational stage from Blue Marsh and Beltzville storage.
+
+    This parameter implements DRBC Water Code §2.5.6 drought staging for the lower basin, independent
+    of the NYC drought level (``drought_level_agg_nyc``).  It is consumed by
+    ``LowerBasinMaxMRFContribution`` to switch conservation releases and expand the usable reservoir
+    list during LB drought conditions.
+
+    Returns
+    -------
+    int
+        Drought stage code:
+
+        * **0 — Normal**: Beltzville ≥ 73.7 % AND Blue Marsh ≥ 68.9 % of DRBC usable storage.
+        * **1 — LB Drought Warning**: Either reservoir below its normal-stage threshold.
+        * **2 — LB Drought**: BOTH Beltzville < 38.0 % AND Blue Marsh < 36.8 % of DRBC usable
+          storage *for three consecutive simulation days*.
+
+    Storage fractions are computed relative to DRBC usable conservation-pool capacity:
+
+    * Beltzville (``beltzvilleCombined``): 13 500 MG
+    * Blue Marsh (``blueMarsh``): 7 450 MG
+
+    The 3-consecutive-day persistence requirement for the full Drought declaration is tracked via
+    an internal per-scenario counter that is updated in ``after()`` at the end of each timestep.
+
+    Parameters
+    ----------
+    model : pywr.Model
+        The Pywr model instance.
+    node_beltzville : pywr.Node
+        Storage node for ``reservoir_beltzvilleCombined``.
+    node_blueMarsh : pywr.Node
+        Storage node for ``reservoir_blueMarsh``.
+
+    References
+    ----------
+    DRBC Water Code §2.5.6 — Lower Basin Drought Stages
+    FFMP 2017 Appendix A Table 4 — LB Conservation Release Schedule
+    """
+
+    # -------------------------------------------------------------------------
+    # Thresholds (fraction of DRBC usable conservation storage)
+    # Source: Water Code §2.5.6 and lower_basin_ffmp.priority_use_during_drought
+    # -------------------------------------------------------------------------
+    # Normal / Drought-Warning boundary
+    BETZ_WARNING_FRAC = 0.737   # Beltzville Elev 615 ft
+    BM_WARNING_FRAC   = 0.689   # Blue Marsh  Elev 283 ft
+
+    # Warning / Drought boundary — both must persist 3 days for full Drought
+    BETZ_DROUGHT_FRAC = 0.380   # Beltzville Elev 590 ft
+    BM_DROUGHT_FRAC   = 0.368   # Blue Marsh  Elev 273 ft
+
+    # DRBC usable conservation-pool storage (MG)
+    MAX_VOL_BELTZVILLE = 13_500
+    MAX_VOL_BLUEMARSH  =  7_450
+
+    # Days of persistence required before full LB Drought is declared
+    DROUGHT_PERSIST_DAYS = 3
+
+    def __init__(self, model, node_beltzville, node_blueMarsh, **kwargs):
+        """
+        Initialize LowerBasinDroughtLevel.
+
+        Parameters
+        ----------
+        model : pywr.Model
+            The Pywr model instance.
+        node_beltzville : pywr.Node
+            Pywr storage node for Beltzville reservoir.
+        node_blueMarsh : pywr.Node
+            Pywr storage node for Blue Marsh reservoir.
+        **kwargs
+            Additional keyword arguments passed to the base Parameter class.
+        """
+        super().__init__(model, **kwargs)
+        self.node_beltzville = node_beltzville
+        self.node_blueMarsh  = node_blueMarsh
+
+    def setup(self):
+        """Allocate per-scenario array tracking consecutive days below LB Drought thresholds."""
+        super().setup()
+        num_scenarios = len(self.model.scenarios.combinations)
+        # Counts days completed *before the current timestep* where both reservoirs
+        # were below the LB Drought (lower) thresholds.
+        self.drought_days_below = np.zeros(num_scenarios, dtype=np.int32)
+
+    def reset(self):
+        """Reset consecutive-day counter to zero at simulation start."""
+        self.drought_days_below[:] = 0
+
+    def value(self, timestep, scenario_index):
+        """
+        Compute the current LB drought stage for a single scenario.
+
+        Parameters
+        ----------
+        timestep : pywr.Timestep
+            The current timestep.
+        scenario_index : pywr.ScenarioIndex
+            The scenario index for which the value is evaluated.
+
+        Returns
+        -------
+        float
+            0 (Normal), 1 (LB Drought Warning), or 2 (LB Drought).
+
+        Notes
+        -----
+        LB Drought (stage 2) requires that today's volumes are also below the drought
+        thresholds AND that at least 2 prior consecutive days were already below those
+        thresholds, giving a total of 3 consecutive days of water-code-defined deficits.
+        """
+        sid = scenario_index.global_id
+
+        betz_vol = float(self.node_beltzville.volume[scenario_index.indices])
+        bm_vol   = float(self.node_blueMarsh.volume[scenario_index.indices])
+
+        betz_frac = betz_vol / self.MAX_VOL_BELTZVILLE
+        bm_frac   = bm_vol   / self.MAX_VOL_BLUEMARSH
+
+        # --- LB Drought (stage 2) ---
+        # Both must be below drought thresholds today and for the 2 prior days
+        today_drought = (betz_frac < self.BETZ_DROUGHT_FRAC) and \
+                        (bm_frac   < self.BM_DROUGHT_FRAC)
+        if today_drought and self.drought_days_below[sid] >= (self.DROUGHT_PERSIST_DAYS - 1):
+            return 2
+
+        # --- LB Drought Warning (stage 1) ---
+        # Either reservoir below its normal-stage threshold
+        if (betz_frac < self.BETZ_WARNING_FRAC) or (bm_frac < self.BM_WARNING_FRAC):
+            return 1
+
+        # --- Normal (stage 0) ---
+        return 0
+
+    def after(self):
+        """
+        Update the consecutive-drought-day counter for all scenarios at end of timestep.
+
+        If both Beltzville and Blue Marsh are below the LB Drought thresholds the
+        counter increments; otherwise it resets to zero.
+        """
+        betz_vols = self.node_beltzville.volume
+        bm_vols   = self.node_blueMarsh.volume
+
+        for s in range(len(self.drought_days_below)):
+            betz_frac = float(betz_vols[s]) / self.MAX_VOL_BELTZVILLE
+            bm_frac   = float(bm_vols[s])   / self.MAX_VOL_BLUEMARSH
+
+            if (betz_frac < self.BETZ_DROUGHT_FRAC) and (bm_frac < self.BM_DROUGHT_FRAC):
+                self.drought_days_below[s] += 1
+            else:
+                self.drought_days_below[s] = 0
+
+    @classmethod
+    def load(cls, model, data):
+        """
+        Load LowerBasinDroughtLevel from a model configuration dictionary.
+
+        Parameters
+        ----------
+        model : pywr.Model
+            The Pywr model instance.
+        data : dict
+            Dictionary from JSON/YAML model input (no special keys required beyond
+            the standard Pywr parameter fields).
+
+        Returns
+        -------
+        LowerBasinDroughtLevel
+            The fully initialized parameter object.
+        """
+        node_beltzville = model.nodes["reservoir_beltzvilleCombined"]
+        node_blueMarsh  = model.nodes["reservoir_blueMarsh"]
+        return cls(model, node_beltzville, node_blueMarsh, **data)
+
+
+### have to register the custom parameter so Pywr recognizes it
+LowerBasinDroughtLevel.register()

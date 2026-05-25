@@ -1265,6 +1265,14 @@ class ModelBuilder:
             "control_curves": [f"level{level}" for level in levels[1:]],
         }
 
+        ### Lower Basin drought stage (independent of NYC drought level)
+        ### Checks Blue Marsh + Beltzville usable-storage fractions against Water Code §2.5.6 thresholds.
+        ### Returns 0=Normal, 1=LB Drought Warning, 2=LB Drought (3-day persistence).
+        ### Consumed by LowerBasinMaxMRFContribution to switch conservation releases.
+        model_dict["parameters"]["drought_level_agg_lb"] = {
+            "type": "LowerBasinDroughtLevel",
+        }
+
         ### Factors defining delivery profiles for NYC and NJ, for each storage level: 1a, 1b, 1c, 2, 3, 4, 5.
         demands = ["nyc", "nj"]
         for demand in demands:

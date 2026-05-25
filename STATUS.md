@@ -5,18 +5,21 @@
 
 ---
 
-## Shared Critical Path Blocker — Affects D1, D2, D4
+## Shared Critical Path Blocker — RESOLVED ✓ (2026-05-25)
 
 **`lower_basin_ffmp.py` — LB drought stage switching**
 
-Nothing that involves LB reservoir drought behavior can run until this is done. See `shared/lower_basin_ffmp_dev/lb_drought_stage_notes.md`.
+**DONE.** All three changes implemented and syntax-verified.
 
-Three changes required:
-1. New `LowerBasinDroughtLevel` custom Parameter in `ffmp.py` — checks Blue Marsh + Beltzville fractions against conservation thresholds
-2. Register `drought_level_agg_lb` in `model_builder.py`
-3. `LowerBasinMaxMRFContribution.value()` in `lower_basin_ffmp.py` — make `R_min` conditional on `drought_level_agg_lb` (currently always uses Normal stage)
+1. ✓ `LowerBasinDroughtLevel` Parameter in `ffmp.py` — checks Blue Marsh + Beltzville fractions
+   against Water Code §2.5.6 thresholds; 3-day persistence counter for full LB Drought
+2. ✓ `drought_level_agg_lb` registered in `model_builder.py` → `add_parameter_nyc_reservoirs_operational_regimes`
+3. ✓ `LowerBasinMaxMRFContribution` in `lower_basin_ffmp.py`:
+   - Loads `drought_level_agg_lb` (graceful KeyError fallback if absent)
+   - `get_current_usable_reservoirs()` checks NYC AND LB drought
+   - `value()` computes R_min dynamically from normal vs drought conservation releases
 
-**Estimated work:** 1–2 focused days. This is the single highest-leverage task in the dissertation.
+**Next step:** Run July–Dec 2004 validation — expect non-zero LB Trenton contributions Oct–Dec 2004.
 
 ---
 

@@ -167,6 +167,11 @@ class LowerBasinMaxMRFContribution(Parameter):
         self.drought_level_agg_nyc = self.parameters["drought_level_agg_nyc"]
         self.children.add(self.drought_level_agg_nyc)
 
+        # Current LB drought level (Water Code §2.5.6; None if not yet in model)
+        self.drought_level_agg_lb = self.parameters.get("drought_level_agg_lb", None)
+        if self.drought_level_agg_lb is not None:
+            self.children.add(self.drought_level_agg_lb)
+
         # Trenton flow requirement
         self.release_needed_mrf_trenton = self.parameters["release_needed_mrf_trenton"]
         self.children.add(self.release_needed_mrf_trenton)
@@ -174,15 +179,13 @@ class LowerBasinMaxMRFContribution(Parameter):
         # Max storage scaling to match priority staging
         self.max_volumes = drbc_max_usable_storages
 
-        # Table 4 of DRBC Water Code
-        # but drought seems to reference lower basin drought... use normal for now
-        self.conservation_releases = conservation_releases
-        self.R_min = self.conservation_releases[self.reservoir]
+        # R_min (conservation release) is now dynamic — computed per-timestep in value()
+        # based on drought_level_agg_lb.  Keep references to both release tables.
+        self.conservation_releases_normal  = conservation_releases
+        self.conservation_releases_drought = lower_basin_drought_conservation_releases
 
         self.max_mrf_daily_contribution = max_mrf_daily_contributions[self.reservoir]
 
-        # Make sure attributes are available from storage node
-        assert self.R_min is not None, f"LowerBasinMaxMRFContribution: R_min is None"
         assert (
             self.max_mrf_daily_contribution is not None
         ), f"LowerBasinMaxMRFContribution: max_mrf_daily_contribution is None"
@@ -207,26 +210,34 @@ class LowerBasinMaxMRFContribution(Parameter):
 
     def get_current_usable_reservoirs(self, scenario_index):
         """
-        Get lower basin reservoirs that are allowed to be used for Trenton flow target currently. 
-        
-        During NYC Normal conditions, only BlueMarsh and Beltzville. 
-        During NYC drought, more are allowed. 
-        
+        Get lower basin reservoirs that are allowed to be used for Trenton flow target currently.
+
+        During NYC Normal conditions, only BlueMarsh and Beltzville are used.
+        Additional reservoirs become available when either NYC is in drought emergency
+        (drought_level_agg_nyc == 6) OR the LB is in any drought stage
+        (drought_level_agg_lb >= 1, i.e. LB Drought Warning or LB Drought).
+
         Parameters
         ----------
         scenario_index : ScenarioIndex
             The index of the simulation scenario.
-            
+
         Returns
         -------
         list
-            Names of currently usable lower basin reservoirs. 
+            Names of currently usable lower basin reservoirs.
         """
-        # based on NYC level        
+        # NYC drought emergency check
         current_nyc_drought_level = self.drought_level_agg_nyc.get_value(scenario_index)
-        is_nyc_drought_emergency = True if current_nyc_drought_level in [6] else False
+        is_nyc_drought_emergency = current_nyc_drought_level >= 6
 
-        if is_nyc_drought_emergency:
+        # LB drought check (any stage above Normal activates expanded reservoir list)
+        is_lb_drought = False
+        if self.drought_level_agg_lb is not None:
+            current_lb_drought_level = self.drought_level_agg_lb.get_value(scenario_index)
+            is_lb_drought = current_lb_drought_level >= 1
+
+        if is_nyc_drought_emergency or is_lb_drought:
             usable_reservoirs = reservoirs_used_during_drought_conditions
         else:
             usable_reservoirs = reservoirs_used_during_normal_conditions
@@ -269,7 +280,16 @@ class LowerBasinMaxMRFContribution(Parameter):
             return 0.0
 
         ### Determine the max allowable contribution from this reservoir
-    
+
+        # Determine conservation release (R_min) based on current LB drought stage
+        # Water Code Table 4: drought-warning / drought releases are lower than normal releases,
+        # conserving storage for later use.
+        if (self.drought_level_agg_lb is not None and
+                self.drought_level_agg_lb.get_value(scenario_index) >= 1):
+            R_min = self.conservation_releases_drought[self.reservoir]
+        else:
+            R_min = self.conservation_releases_normal[self.reservoir]
+
         # We want to return the max allowable contribution from this reservoir
         # But need to consider storages and priority staging of each lower basin reservoir
         percent_storages = {}
@@ -287,7 +307,7 @@ class LowerBasinMaxMRFContribution(Parameter):
             # Add inflow and remove required conservation releases from storage
             inflow = self.parameters[f"flow_{res}"].get_value(scenario_index)
             S_t += inflow
-            S_t -= self.R_min
+            S_t -= R_min
 
             # Storage as fraction of max storage
             S_hat_t = min(S_t / S_max, 1.0)
@@ -403,6 +423,14 @@ class LowerBasinMaxMRFContribution(Parameter):
         parameters["drought_level_agg_nyc"] = load_parameter(
             model, f"drought_level_agg_nyc"
         )
+
+        # LB drought level (Water Code §2.5.6) — graceful fallback if not yet in model
+        try:
+            parameters["drought_level_agg_lb"] = load_parameter(
+                model, "drought_level_agg_lb"
+            )
+        except KeyError:
+            parameters["drought_level_agg_lb"] = None
 
         # Trenton MRF contributions required by NYC and Lower Basin
         # (beyond releases already needed for Montague)

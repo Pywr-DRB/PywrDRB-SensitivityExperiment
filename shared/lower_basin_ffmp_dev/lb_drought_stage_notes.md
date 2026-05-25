@@ -1,5 +1,20 @@
 # Lower Basin Drought-Stage Switching — Implementation Notes
 
+## Status: IMPLEMENTED ✓ — 2026-05-25
+
+Three changes merged into `dissertation/pywrdrb/`:
+1. `parameters/ffmp.py` — `LowerBasinDroughtLevel` class added + registered
+2. `model_builder.py` — `drought_level_agg_lb` registered in `add_parameter_nyc_reservoirs_operational_regimes`
+3. `parameters/lower_basin_ffmp.py` — `LowerBasinMaxMRFContribution` updated:
+   - Loads `drought_level_agg_lb` in `__init__` + `load()` (graceful KeyError fallback)
+   - `get_current_usable_reservoirs()` checks both NYC and LB drought levels
+   - `value()` computes R_min dynamically from `conservation_releases_normal` vs `conservation_releases_drought`
+
+Next step: run July–Dec 2004 validation run and confirm LB Trenton contributions are non-zero in Oct–Dec 2004.
+
+---
+
+
 ## Problem Statement
 
 `lower_basin_ffmp.py` currently only responds to NYC drought level (`drought_level_agg_nyc`).
