@@ -8,9 +8,10 @@
 #          into ~/dissertation/venv — must include mpi4py via system site packages
 #
 # Venv setup (run once before submitting):
-#   module load python/3.11.5 gnu9 openmpi4 py3-mpi4py/3.0.3
+#   module load python/3.11.5 gnu9 openmpi4
 #   python3 -m venv --system-site-packages ~/dissertation/venv
 #   source ~/dissertation/venv/bin/activate
+#   pip install mpi4py --no-cache-dir   # compiled against system OpenMPI
 #   pip install -e ~/dissertation/pywrdrb/
 #
 # Submit: sbatch run_workflow.sh
@@ -22,8 +23,8 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --time=04:00:00
 
-# Load modules (must match venv creation environment)
-module load python/3.11.5 gnu9 openmpi4 py3-mpi4py/3.0.3
+# Load modules (mpi4py is pip-installed in venv against this OpenMPI; do NOT load py3-mpi4py module)
+module load python/3.11.5 gnu9 openmpi4
 
 # Activate dissertation venv (installed from ~/dissertation/pywrdrb/)
 source ~/dissertation/venv/bin/activate
