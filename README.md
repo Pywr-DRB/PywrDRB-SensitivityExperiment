@@ -126,12 +126,42 @@ mpirun -n 8 python3 01_prep_pywrdrb_inputs.py
 
 | Dir | Topic | Key model dependency |
 |---|---|---|
-| D1 | Decision Scaling — GCM probability weighting | CMIP6 SSP245 runs, synthetic generator |
+| D1 | Decision Scaling — GCM probability weighting | CMIP6 SSP245 runs, Kirsch-Nowak generator |
 | D2 | FIRO flood-drought compound risk | Pywr-DRB + HEC-ResSim |
 | D3 | Satellite-informed reservoir inference | FSM oracle, InfeRes |
 | D4 | Cooperative risk metrics (5-party DRB) | Pywr-DRB RRV, LB drought stage |
 
 **Shared blocker:** LB drought stage switching (`lower_basin_ffmp.py`) — required by D1, D4, and D2. See `shared/lower_basin_ffmp_dev/lb_drought_stage_notes.md`.
+
+---
+
+## PywrDRB Organization — CMIP6 Integration Map
+
+Surveyed 2026-05-25 across all 16 Pywr-DRB GitHub repos:
+
+| Repo | CMIP6 dataset | How it's used |
+|---|---|---|
+| `CMIP6_multimodel_streamflow` | Kao et al. 10.13139/OLCF/2318650 | Bias-corrected streamflow at DRB nodes (PRMS + VIC5) — **D1/D4 source** |
+| `CMIP6_multimodel_hydroclimate` | Kao et al. 10.13139/OLCF/2311812 | Raw gridded climate (precip/temp) aggregated to 33 watershed nodes — upstream of streamflow repo |
+| `StochasticExploratoryExperiment` | CMIP6 PRMS 2020-2059 monthly shifts | 3 discrete climate scenarios fed into Kirsch-Nowak generator — **D1 infrastructure template** |
+| All others | None | Use historical NHMv10 / WRF flows only |
+
+### How CMIP6 enters the Kirsch-Nowak generator (SEE pattern)
+
+```
+CMIP6 gage_flow_mgd.csv (SSP245, 2020-2059)
+    → compute monthly mean % change vs Daymet2019 baseline
+    → 12-value monthly shift vector
+    → kirsch_gen.mean_month *= (1 + prc_change/100)  [log-scale]
+    → KirschGenerator samples synthetic flows from shifted distribution
+    → NowakDisaggregator disaggregates monthly → daily
+    → 02_prep_pywrdrb_inputs.py converts to pywrdrb inflow format
+    → 03_run_pywrdrb_simulations.py runs Pywr-DRB
+```
+
+**D1 extends this:** instead of 3 discrete scenarios, maps all 14 CMIP6 projections to monthly shift vectors, sweeps scenario space for failure surface, weights by GCM skill.
+
+SEE infrastructure is in `D1_decision_scaling/stochastic_experiment/` — scripts, methods library, and the template climate scenario CSV.
 
 ---
 
@@ -145,3 +175,5 @@ mpirun -n 8 python3 01_prep_pywrdrb_inputs.py
 | 2026-05-25 | `run_workflow.sh` updated: full module chain, dissertation venv path | dissertation |
 | 2026-05-25 | Bug fix: `pywrdrb/pre/extrapolate_nyc_nj_diversions.py:659` — `df_long_m["nn"] = pd.NaT` (was `-1`); newer pandas rejects Timestamp assignment into int64 column | dissertation |
 | 2026-05-25 | Bug fix: venv mpi4py — pip-installed against system OpenMPI (py3-mpi4py module is Python 3.6 only) | dissertation |
+| 2026-05-25 | `D1_decision_scaling/stochastic_experiment/` added from StochasticExploratoryExperiment | Trevor Amestoy |
+| 2026-05-25 | CMIP6 preprocessing complete: diversions + predicted inflows generated for all 72 datasets (SLURM jobs 245198, 245199) | dissertation |
