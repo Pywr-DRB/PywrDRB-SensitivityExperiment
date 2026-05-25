@@ -1,0 +1,42 @@
+# Virtual environments
+venv/
+pywrdrb/venv*/
+pywrdrb/wsl_venv*/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Large model outputs (HDF5, JSON model files)
+cmip6/pywrdrb/outputs/
+cmip6/pywrdrb/json/
+pywrdrb/model_runs/*.hdf5
+pywrdrb/model_runs/*.json
+
+# CMIP6 data (symlink — actual data lives in ~/Research/CMIP6_multimodel_streamflow/)
+# cmip6/pywrdrb/inputs is a symlink; git will track the link itself, not the data
+
+# Logs and job output
+*.out
+*.err
+*.log
+cmip6/logs/
+
+# Editor artifacts
+.idea/
+*.swp
+*~
+.DS_Store
+
+# pywr debug
+pywr_glpk_debug*
+
+# Figures (generated)
+D1_decision_scaling/figures/
+D2_flood_drought/figures/
+D3_satellite_observability/figures/
+D4_cooperative_risk/figures/
+pywrdrb/figs/
