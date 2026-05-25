@@ -146,22 +146,26 @@ Surveyed 2026-05-25 across all 16 Pywr-DRB GitHub repos:
 | `StochasticExploratoryExperiment` | CMIP6 PRMS 2020-2059 monthly shifts | 3 discrete climate scenarios fed into Kirsch-Nowak generator — **D1 infrastructure template** |
 | All others | None | Use historical NHMv10 / WRF flows only |
 
-### How CMIP6 enters the Kirsch-Nowak generator (SEE pattern)
+### D1 CMIP6 role — Step 3 only (probability weighting, not generator input)
 
 ```
-CMIP6 gage_flow_mgd.csv (SSP245, 2020-2059)
-    → compute monthly mean % change vs Daymet2019 baseline
-    → 12-value monthly shift vector
-    → kirsch_gen.mean_month *= (1 + prc_change/100)  [log-scale]
-    → KirschGenerator samples synthetic flows from shifted distribution
-    → NowakDisaggregator disaggregates monthly → daily
-    → 02_prep_pywrdrb_inputs.py converts to pywrdrb inflow format
-    → 03_run_pywrdrb_simulations.py runs Pywr-DRB
+Step 1+2: Build failure surface
+    Streamflow generator (Kirsch or Gosney — pending Scott)
+        → synthetic DRB daily flows at prescribed percentile
+    + SLR level → DRBC 2025-6 TFO → Pywr-DRB parameter
+    + LB contribution volume → institutional cap → Pywr-DRB parameter
+    → Pywr-DRB v2 run (daily, FFMP drought stages, IERQ banking)
+    → pass/fail per cell (Trenton reliability × shortfall severity × LB depletion)
+
+Step 3: GCM probability weighting (CMIP6 enters here)
+    CMIP6 gage_flow_mgd.csv (SSP245, 2020-2059) × 14 projections
+        → extract streamflow statistic per projection
+        → map to cell on failure surface streamflow axis
+        → count projections per cell → probability weight
+    → "X% of CMIP6 projections place DRB in failure region by 2075"
 ```
 
-**D1 extends this:** instead of 3 discrete scenarios, maps all 14 CMIP6 projections to monthly shift vectors, sweeps scenario space for failure surface, weights by GCM skill.
-
-SEE infrastructure is in `D1_decision_scaling/stochastic_experiment/` — scripts, methods library, and the template climate scenario CSV.
+**SEE (`stochastic_experiment/`) is reference-only** — Trevor Amestoy's separate paper. D1's experiment design is distinct: 3-axis failure surface (streamflow × SLR × LB volume), daily Pywr-DRB with FFMP drought stage switching, and NYC IERQ vs LB storage attribution. See `D1_decision_scaling/README.md`.
 
 ---
 
