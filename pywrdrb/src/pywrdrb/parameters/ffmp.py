@@ -2123,8 +2123,10 @@ class LowerBasinDroughtLevel(Parameter):
         """
         sid = scenario_index.global_id
 
-        betz_vol = float(self.node_beltzville.volume[scenario_index.indices])
-        bm_vol   = float(self.node_blueMarsh.volume[scenario_index.indices])
+        # Use global_id (integer) to index the volume array — avoids the 1-element
+        # tuple-index ambiguity that makes float() raise "0-d array" errors.
+        betz_vol = float(np.asarray(self.node_beltzville.volume).ravel()[sid])
+        bm_vol   = float(np.asarray(self.node_blueMarsh.volume).ravel()[sid])
 
         betz_frac = betz_vol / self.MAX_VOL_BELTZVILLE
         bm_frac   = bm_vol   / self.MAX_VOL_BLUEMARSH
@@ -2151,8 +2153,8 @@ class LowerBasinDroughtLevel(Parameter):
         If both Beltzville and Blue Marsh are below the LB Drought thresholds the
         counter increments; otherwise it resets to zero.
         """
-        betz_vols = self.node_beltzville.volume
-        bm_vols   = self.node_blueMarsh.volume
+        betz_vols = np.asarray(self.node_beltzville.volume).ravel()
+        bm_vols   = np.asarray(self.node_blueMarsh.volume).ravel()
 
         for s in range(len(self.drought_days_below)):
             betz_frac = float(betz_vols[s]) / self.MAX_VOL_BELTZVILLE

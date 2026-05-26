@@ -40,3 +40,7 @@ D2_flood_drought/figures/
 D3_satellite_observability/figures/
 D4_cooperative_risk/figures/
 pywrdrb/figs/
+
+# LB drought stage validation outputs (generated, not tracked)
+shared/lower_basin_ffmp_dev/outputs/
+shared/lower_basin_ffmp_dev/figures/
