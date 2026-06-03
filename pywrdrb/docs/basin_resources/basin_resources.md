@@ -1,3 +1,0 @@
-# Basin Resources
-```{tableofcontents}
-```
