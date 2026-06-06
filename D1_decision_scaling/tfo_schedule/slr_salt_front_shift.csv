@@ -1,0 +1,7 @@
+slr_id,slr_m,delta_rm_upstream,rm_protect_camden,source,status
+S0,0.0,0.0,98.0,DRBC Dec 2025; no SLR shift at baseline,confirmed
+S1,0.3,2.0,98.0,DRBC Dec 2025 scenario 1; provisional until PDF table digitized,provisional
+S2,0.5,4.0,98.0,DRBC Dec 2025 scenario 2; aligns with >0.5 m stress narrative,provisional
+S3,0.8,6.0,98.0,DRBC Dec 2025 scenario 3,provisional
+S4,1.2,9.0,98.0,DRBC Dec 2025 scenario 4,provisional
+S5,1.6,12.0,98.0,DRBC Dec 2025 scenario 5 (upper bound),provisional

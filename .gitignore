@@ -26,7 +26,15 @@ pywrdrb/model_runs/*.json
 *.out
 *.err
 *.log
-cmip6/logs/
+
+# Working notes, briefings, and run logs (local only — not versioned)
+notes/
+**/notes/
+briefing
+**/briefing
+committee
+logs/
+**/logs/
 
 # Editor artifacts
 .idea/
@@ -52,6 +60,10 @@ shared/lower_basin_ffmp_dev/figures/
 # Sobol task CSVs (14,336+ files, each 50 rows × 29 cols)
 D4_distributed_risk/results/sobol/task_outputs/
 D4_distributed_risk/results/sobol_sweep2/task_outputs/
+D4_distributed_risk/results/sobol_sweep3/task_outputs/
+D4_distributed_risk/results/sobol_sweep3/synthetic_flows/
+D4_distributed_risk/results/sobol_sweep3/*.parquet
+D4_distributed_risk/results/sobol_sweep3/*.txt
 # Baseline per-member HDF5 model outputs and inputs
 D4_distributed_risk/results/baseline/member_*/
 D4_distributed_risk/results/baseline_prerun/
@@ -69,16 +81,13 @@ D4_distributed_risk/results/baseline/*.csv
 D4_distributed_risk/results/baseline/*.json
 # D4 figures (generated)
 D4_distributed_risk/figures/
-# D4 logs (SLURM output files)
-D4_distributed_risk/logs/
 # LHC sensitivity scratch outputs
 D4_distributed_risk/lhc_sensitivity/
 
 # D1 large outputs
+D1_decision_scaling/generator/synthetic_flows/
 D1_decision_scaling/results/
 D1_decision_scaling/figures/
-D1_decision_scaling/logs/
-
 # Shared pywrdrb utility cache
 shared/pywrdrb_utils/__pycache__/
 pywrdrb/

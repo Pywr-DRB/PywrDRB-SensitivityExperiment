@@ -1,0 +1,16 @@
+param,party,slope_nyc_limited,slope_lb_limited,sign_flip
+alpha_betz_warning,DE,1.1e-05,5e-06,False
+alpha_betz_warning,NYC,-1.4e-05,7.6e-05,True
+alpha_betz_warning,PA,-0.006807,-0.007477,False
+alpha_betz_warning,NJ,-0.00014,-1.1e-05,False
+alpha_betz_warning,NY,0.0,-2e-06,True
+alpha_bm_warning,DE,2.3e-05,8e-06,False
+alpha_bm_warning,NYC,5.8e-05,5e-06,False
+alpha_bm_warning,PA,-0.003702,-0.005778,False
+alpha_bm_warning,NJ,-0.002087,-0.001492,False
+alpha_bm_warning,NY,2e-06,1e-06,False
+tau_recovery,DE,4e-06,4e-06,False
+tau_recovery,NYC,3e-06,-4e-06,True
+tau_recovery,PA,-4.8e-05,-2e-05,False
+tau_recovery,NJ,-0.000578,-0.000569,False
+tau_recovery,NY,0.0,0.0,False

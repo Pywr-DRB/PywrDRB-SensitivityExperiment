@@ -1,0 +1,16 @@
+param,party,slope_per_decile,range
+alpha_betz_warning,DE,2.9e-05,0.000236
+alpha_betz_warning,NYC,0.000186,0.001684
+alpha_betz_warning,PA,-0.016616,0.152832
+alpha_betz_warning,NJ,-0.001588,0.013244
+alpha_betz_warning,NY,-0.0,1.6e-05
+alpha_bm_warning,DE,2.6e-05,0.000208
+alpha_bm_warning,NYC,0.000107,0.00099
+alpha_bm_warning,PA,-0.009382,0.085263
+alpha_bm_warning,NJ,-0.002409,0.021349
+alpha_bm_warning,NY,2e-06,1.4e-05
+tau_recovery,DE,4e-06,3.8e-05
+tau_recovery,NYC,-0.0,6e-05
+tau_recovery,PA,-1.6e-05,0.002244
+tau_recovery,NJ,-0.000572,0.005201
+tau_recovery,NY,0.0,2e-06

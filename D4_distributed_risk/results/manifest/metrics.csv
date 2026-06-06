@@ -1,0 +1,9 @@
+short_name,recorder_name,party,metrics_driven,in_hdf5,note
+del_trenton_flow,link_delTrenton,DE,"de_reliability, de_resiliency, de_vulnerability, de_shortfall_days, de_max_deficit_mgd",True,"Confirmed 2026-06-01 — range [607, 88439 MGD]"
+del_montague_flow,link_delMontague,NY,"ny_reliability, ny_resiliency, ny_vulnerability, ny_shortfall_days",True,"Confirmed 2026-06-01 — range [452, 75763 MGD]"
+ierq_bank_remaining,IERQRelease_step1,NYC,"nyc_ierq_exhaustion_days, nyc_ierq_exhaustion_reliability, nyc_min_ierq_balance_mg",False,"IERQRelease_step1 records DAILY RELEASE, not bank balance. Bank balance tracked internally in banks.py with no named recorder. All NYC IERQ metrics return NaN until a bank_balance recorder is added to pywrdrb."
+beltzville_volume,reservoir_beltzvilleCombined,PA,"pa_depletion_days, pa_depletion_reliability, pa_min_storage_frac, pa_depletion_resiliency",True,"Confirmed 2026-06-01 — range [0, 13500 MG]"
+blueMarsh_volume,reservoir_blueMarsh,PA,(combined with beltzville_volume),True,"Confirmed 2026-06-01 — range [0, 33074 MG]"
+lb_drought_stage,drought_level_agg_lb,NJ,"nj_lb_restriction_days, nj_shortfall_days, nj_delivery_reliability",True,Integer stage 0/1/2. Confirmed 2026-06-01
+nyc_drought_stage,drought_level_agg_nyc,NYC,(not used in metric yet),True,Integer stage 0-6. Not currently used in any metric function
+nj_delivery,delivery_nj,NJ,"nj_delivery_reliability, nj_mean_delivery_mgd",True,"Confirmed 2026-06-01 — range [0.31, 109.61 MGD]"

@@ -1,0 +1,33 @@
+D4 Sobol Sensitivity Analysis — Experiment Design Summary
+============================================================
+Saltelli sample count (N):        1024
+Parameters (k):                   6
+Total runs (N × (2k+2)):          14,336
+Synthetic realizations per sample: 50
+Total pywrdrb runs:               716,800
+
+Parameter injection status:
+  Fully implemented:  3/6  (alpha_betz, alpha_bm, tau_recovery)
+  Placeholder only:   2/6  (q_nj_warning, ierq_max_bg — UserWarning)
+  Not implemented:    1/6  (m_lb — NotImplementedError)
+
+Target metrics:
+  de_reliability
+  de_vulnerability
+  nyc_ierq_exhaustion_days
+  pa_depletion_days
+  nj_lb_restriction_days
+  ny_reliability
+
+Known gaps:
+  NYC metrics: ALL NaN (IERQ bank balance not recorded in pywrdrb HDF5)
+  PA metric threshold: fixed at LB_CONSERVATION_FRAC even when alpha params vary
+  m_lb: no effect on any run (always uses model default 1.0)
+  q_nj_warning, ierq_max_bg: no effect on any run (UserWarning only)
+
+Synthetic forcing:
+  Generator: Kirsch-Nowak (synhydro 0.0.2)
+  Calibration: pub_nhmv10_BC_withObsScaled catchment inflows, 1946-2005
+  Sites: 7 major Kirsch sites + 24 minor sites (annual block bootstrap)
+  Realizations: 50 × 79-year daily flows at all 31 pywrdrb nodes
+  Files: D4_distributed_risk/results/sobol/synthetic_flows/realization_{r:03d}.parquet

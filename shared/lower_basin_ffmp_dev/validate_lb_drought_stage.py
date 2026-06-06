@@ -16,6 +16,11 @@ Water Code §2.5.6 thresholds (fraction of DRBC usable conservation storage):
     Warning: Beltzville < 73.7 %  OR  Blue Marsh < 68.9 %
     Drought: Beltzville < 38.0 % AND  Blue Marsh < 36.8 %  for 3 consecutive days
 
+Exit criteria (§2.5.6.E):
+    Any drought stage exits after 30 consecutive days where the instantaneous stage
+    is lower than the declared stage, OR immediately upon a spill event at either
+    reservoir (storage >= 100 % of DRBC usable conservation capacity).
+
 DRBC usable conservation storage:
     beltzvilleCombined: 13 500 MG
     blueMarsh:           7 450 MG
@@ -65,17 +70,97 @@ VAL_END   = "2004-12-31"
 # PART 1  —  UNIT TESTS  (pure logic, no Pywr)
 # ============================================================
 
+DROUGHT_PERSIST_DAYS  = 3
+RECOVERY_PERSIST_DAYS = 30
+
+
 def _lb_stage(betz_frac: float, bm_frac: float, days_below: int) -> int:
     """
-    Pure-Python mirror of LowerBasinDroughtLevel.value().
-    Used exclusively for unit testing — not called by the model.
+    Instantaneous LB stage — mirrors LowerBasinDroughtLevel.value() *entry* logic
+    (no hysteresis).  Used for unit tests that check entry conditions in isolation.
+    drought_days_below is the count from *prior* days (before the current timestep's
+    after() update), so stage-2 requires days_below >= DROUGHT_PERSIST_DAYS - 1 = 2.
     """
     today_drought = (betz_frac < BETZ_DROUGHT_FRAC) and (bm_frac < BM_DROUGHT_FRAC)
-    if today_drought and days_below >= 2:
+    if today_drought and days_below >= (DROUGHT_PERSIST_DAYS - 1):
         return 2
     if (betz_frac < BETZ_WARNING_FRAC) or (bm_frac < BM_WARNING_FRAC):
         return 1
     return 0
+
+
+def _simulate_declared_stage(storage_trace):
+    """
+    Simulate the full hysteresis logic of LowerBasinDroughtLevel over a sequence
+    of (betz_frac, bm_frac) pairs.
+
+    Mirrors the combined value() + after() logic:
+      - value() returns declared_stage if inst < declared, else inst (fast entry)
+      - after() updates drought_days_below, computes inst (using updated counter,
+        so stage-2 requires days_below >= DROUGHT_PERSIST_DAYS after update), then
+        applies hysteresis: spill → 0 immediately; inst >= declared → accept;
+        inst < declared → count recovery_days, accept after RECOVERY_PERSIST_DAYS.
+
+    Parameters
+    ----------
+    storage_trace : list of (betz_frac, bm_frac)
+        One entry per simulated day.
+
+    Returns
+    -------
+    list of int
+        The declared stage returned by value() on each day.
+    """
+    drought_days_below = 0
+    recovery_days      = 0
+    declared           = 0
+    returned_stages    = []
+
+    for betz_f, bm_f in storage_trace:
+        # ----- value() phase (reads state from end of previous day) -----
+        today_drought_v = (betz_f < BETZ_DROUGHT_FRAC) and (bm_f < BM_DROUGHT_FRAC)
+        if today_drought_v and drought_days_below >= (DROUGHT_PERSIST_DAYS - 1):
+            inst_v = 2
+        elif (betz_f < BETZ_WARNING_FRAC) or (bm_f < BM_WARNING_FRAC):
+            inst_v = 1
+        else:
+            inst_v = 0
+
+        returned = inst_v if inst_v >= declared else declared
+        returned_stages.append(returned)
+
+        # ----- after() phase (reads end-of-timestep = same storage here) -----
+        spill = (betz_f >= 1.0) or (bm_f >= 1.0)
+
+        # Update drought_days_below counter
+        today_drought_a = (betz_f < BETZ_DROUGHT_FRAC) and (bm_f < BM_DROUGHT_FRAC)
+        if today_drought_a:
+            drought_days_below += 1
+        else:
+            drought_days_below = 0
+
+        # Instantaneous stage using UPDATED counter (>= DROUGHT_PERSIST_DAYS = 3)
+        if today_drought_a and drought_days_below >= DROUGHT_PERSIST_DAYS:
+            inst_a = 2
+        elif (betz_f < BETZ_WARNING_FRAC) or (bm_f < BM_WARNING_FRAC):
+            inst_a = 1
+        else:
+            inst_a = 0
+
+        # Hysteresis update
+        if spill:
+            declared      = 0
+            recovery_days = 0
+        elif inst_a >= declared:
+            declared      = inst_a
+            recovery_days = 0
+        else:
+            recovery_days += 1
+            if recovery_days >= RECOVERY_PERSIST_DAYS:
+                declared      = inst_a
+                recovery_days = 0
+
+    return returned_stages
 
 
 def run_unit_tests() -> int:
@@ -199,6 +284,116 @@ def run_unit_tests() -> int:
         check(f"Day {day}: betz={bf:.2f} bm={bmf:.2f} days_prior={days_below-1 if days_below>0 else 0} → stage {expected_stages[day]}",
               stage, expected_stages[day])
 
+    # ---- 30-day recovery exit — stage 2 → stage 1 --------------------------------
+    # Scenario: 3-day drought entry, then one reservoir rises above drought but
+    # stays below warning threshold.  Stage should NOT drop until day 30 of recovery.
+    print("\n-- 30-day exit: Drought (2) → Warning (1) --")
+    # Build trace: 3 days at full-drought fracs, then 60 days at (betz=0.45, bm=0.30)
+    # betz=0.45 > BETZ_DROUGHT_FRAC → today_drought = False; both still < warning → inst=1
+    DROUGHT_ENTRY  = (BETZ_DROUGHT_FRAC - 0.01, BM_DROUGHT_FRAC - 0.01)  # both below drought
+    RECOVERY_COND  = (0.45, BM_DROUGHT_FRAC - 0.01)  # betz above drought, bm below warning
+    trace_30 = [DROUGHT_ENTRY] * 3 + [RECOVERY_COND] * 60
+    stages_30 = _simulate_declared_stage(trace_30)
+
+    check("Day 3 (3rd drought day): declared stage = 2",
+          stages_30[2], 2)
+    check("Day 4 (recovery day 1): declared stage still = 2 (sticky)",
+          stages_30[3], 2)
+    check("Day 32 (recovery day 29): declared stage still = 2",
+          stages_30[3 + 28], 2)
+    check("Day 33 (recovery day 30 complete in after()): declared stage still = 2 in value()",
+          stages_30[3 + 29], 2)
+    check("Day 34 (first day after 30-day threshold met): declared stage = 1",
+          stages_30[3 + 30], 1)
+    check("No stage-0 during partial recovery (bm still below warning)",
+          all(s >= 1 for s in stages_30[3:]), True)
+
+    # ---- 30-day recovery exit — stage 1 → stage 0 --------------------------------
+    print("\n-- 30-day exit: Warning (1) → Normal (0) --")
+    # Build trace: 5 warning days (only betz below warning), then 60 days both above
+    WARN_ONLY   = (BETZ_WARNING_FRAC - 0.01, BM_WARNING_FRAC + 0.05)  # betz below, bm above
+    NORMAL_COND = (BETZ_WARNING_FRAC + 0.05, BM_WARNING_FRAC + 0.05)  # both above warning
+    trace_w = [WARN_ONLY] * 5 + [NORMAL_COND] * 60
+    stages_w = _simulate_declared_stage(trace_w)
+
+    check("Day 1 warning entry: declared stage = 1",
+          stages_w[0], 1)
+    check("Day 6 (normal cond day 1): declared stage still = 1 (sticky)",
+          stages_w[5], 1)
+    check("Day 34 (normal cond day 29): declared stage still = 1",
+          stages_w[5 + 28], 1)
+    check("Day 36 (normal cond day 30 complete): declared stage drops to 0",
+          stages_w[5 + 30], 0)
+
+    # ---- Partial recovery then relapse — counter resets --------------------------
+    print("\n-- Partial recovery relapse: exit counter resets on re-entry --")
+    # 3 drought days → 15 recovery days → 3 more drought days → check recovery reset
+    trace_relapse = (
+        [DROUGHT_ENTRY] * 3           # days 0-2: drought entry
+        + [RECOVERY_COND] * 15        # days 3-17: 15 recovery days (not enough)
+        + [DROUGHT_ENTRY] * 3         # days 18-20: relapse, must re-enter drought
+        + [RECOVERY_COND] * 35        # days 21-55: another 30+ recovery days
+    )
+    stages_relapse = _simulate_declared_stage(trace_relapse)
+
+    check("Day 2: stage 2 declared",
+          stages_relapse[2], 2)
+    check("Day 17 (recovery day 15): stage still 2 (counter not reset by relapse yet)",
+          stages_relapse[17], 2)
+    # After relapse: another 3 drought days → stage back to 2, recovery resets
+    check("Day 20 (3rd relapse day): back to stage 2",
+          stages_relapse[20], 2)
+    # Post-relapse recovery restarts at day 21 with recovery_days=0.
+    # after() day 21 → recovery_days=1; after() day 50 → recovery_days=30 → exit fires.
+    # value() day 50 still sees declared=2 (after() fires after value()); day 51 sees 1.
+    check("Day 50 (recovery day 30 complete in after()): value() still returns 2",
+          stages_relapse[50], 2)
+    check("Day 51 (first value() call after 30-day post-relapse exit): stage 1",
+          stages_relapse[51], 1)
+
+    # ---- Spill exit — immediate reset to stage 0 ---------------------------------
+    print("\n-- Spill exit: immediate stage-0 on reservoir spill --")
+    SPILL_COND = (1.05, 1.05)   # both above 100% usable storage → spill
+    trace_spill = [DROUGHT_ENTRY] * 3 + [SPILL_COND] * 3 + [DROUGHT_ENTRY] * 2
+    stages_spill = _simulate_declared_stage(trace_spill)
+
+    check("Day 2: stage 2 before spill",
+          stages_spill[2], 2)
+    check("Day 3 (spill day 1): stage still 2 in value() (spill in after(), takes effect day 4)",
+          stages_spill[3], 2)
+    check("Day 4 (after spill processed in after()): stage drops to 0",
+          stages_spill[4], 0)
+    # After spill clears, 2 drought days restart without enough persistence → Warning
+    check("Day 6 (2nd drought day post-spill): stage 1 (3-day persistence not yet met)",
+          stages_spill[6], 1)
+
+    # ---- Stage-2 entry cannot be delayed by already-declared stage 2 --------------
+    print("\n-- Stage-2 re-entry during recovery: no artificial delay --")
+    # declared=2, 20 recovery days, then 3 new drought days → should return 2 immediately
+    trace_reentry = (
+        [DROUGHT_ENTRY] * 3   # initial drought
+        + [RECOVERY_COND] * 20  # 20 recovery days (not yet exited)
+        + [DROUGHT_ENTRY] * 3   # 3 new drought days — re-enter stage 2 immediately
+    )
+    stages_reentry = _simulate_declared_stage(trace_reentry)
+    # Day 25 is 3rd new drought day (indices 3+20=23, 24, 25)
+    check("Day 25 (3rd new drought day): stage 2 via fast entry",
+          stages_reentry[25], 2)
+
+    # ---- RECOVERY_PERSIST_DAYS class attribute -----------------------------------
+    print("\n-- Class attribute: RECOVERY_PERSIST_DAYS --")
+    try:
+        from pywrdrb.parameters.ffmp import LowerBasinDroughtLevel
+        check("RECOVERY_PERSIST_DAYS == 30",
+              LowerBasinDroughtLevel.RECOVERY_PERSIST_DAYS, 30)
+        check("DROUGHT_PERSIST_DAYS == 3",
+              LowerBasinDroughtLevel.DROUGHT_PERSIST_DAYS, 3)
+        check("setup() creates recovery_days array (checked via new instance attr name)",
+              hasattr(LowerBasinDroughtLevel, "RECOVERY_PERSIST_DAYS"), True)
+    except Exception as e:
+        failures += 1
+        print(f"  [FAIL]  attribute check: {e}")
+
     # ---- Import check — LowerBasinDroughtLevel registered with Pywr -----------
     print("\n-- Pywr registration --")
     try:
@@ -224,6 +419,10 @@ def run_unit_tests() -> int:
               LowerBasinDroughtLevel.MAX_VOL_BELTZVILLE, 13_500)
         check("MAX_VOL_BLUEMARSH == 7450",
               LowerBasinDroughtLevel.MAX_VOL_BLUEMARSH, 7_450)
+        check("DROUGHT_PERSIST_DAYS == 3",
+              LowerBasinDroughtLevel.DROUGHT_PERSIST_DAYS, 3)
+        check("RECOVERY_PERSIST_DAYS == 30",
+              LowerBasinDroughtLevel.RECOVERY_PERSIST_DAYS, 30)
     except Exception as e:
         failures += 1
         print(f"  [FAIL]  import / registry check: {e}")
@@ -390,29 +589,43 @@ def run_integration_tests(data: dict) -> int:
         print(f"  [INFO]  No Warning or Drought days in Jul–Dec 2004 under nhmv10 — "
               f"LB stays above §2.5.6 warning thresholds in this dataset.")
 
-    # --- Verify stage matches raw fractions independently ---
-    # Recompute drought_days_below and expected stage from raw storage
-    print("\n  Verification: recomputing stage from raw storage fractions …")
+    # --- Verify stage matches raw fractions independently (with hysteresis) ---
+    # Use _simulate_declared_stage which mirrors the full value() + after() logic
+    # including 30-day exit hysteresis and spill detection.
+    print("\n  Verification: recomputing declared stage from raw storage fractions …")
+    storage_seq = list(zip(
+        bz_frac.values.tolist(),
+        bm_frac.values.tolist(),
+    ))
+    expected_stage_list = _simulate_declared_stage(storage_seq)
+    expected_stage      = np.array(expected_stage_list, dtype=int)
+
+    expected_s = pd.Series(expected_stage, index=date_range)
+    n_match  = (lb_stage == expected_s).sum()
+    n_total  = T
+    pct_match = 100.0 * n_match / n_total
+    check(f"Model declared stage matches hysteresis-aware recomputed stage ≥ 99% of days",
+          pct_match >= 99.0,
+          f"match: {n_match}/{n_total} ({pct_match:.2f}%)")
+
+    # Also report instantaneous (no-hysteresis) match for reference
     days_below_arr = np.zeros(T, dtype=int)
-    expected_stage = np.zeros(T, dtype=int)
+    inst_stage     = np.zeros(T, dtype=int)
     for t in range(T):
-        bf   = float(bz_frac.iloc[t])
-        bmf  = float(bm_frac.iloc[t])
-        d    = int(days_below_arr[t - 1]) if t > 0 else 0
-        expected_stage[t] = _lb_stage(bf, bmf, d)
-        # update counter (mirrors after())
+        bf  = float(bz_frac.iloc[t])
+        bmf = float(bm_frac.iloc[t])
+        d   = int(days_below_arr[t - 1]) if t > 0 else 0
+        inst_stage[t] = _lb_stage(bf, bmf, d)
         if (bf < BETZ_DROUGHT_FRAC) and (bmf < BM_DROUGHT_FRAC):
             days_below_arr[t] = d + 1
         else:
             days_below_arr[t] = 0
-
-    expected_s = pd.Series(expected_stage, index=date_range)
-    n_match = (lb_stage == expected_s).sum()
-    n_total = T
-    pct_match = 100.0 * n_match / n_total
-    check(f"Model stage matches independently-recomputed stage ≥ 99% of days",
-          pct_match >= 99.0,
-          f"match: {n_match}/{n_total} ({pct_match:.2f}%)")
+    inst_s     = pd.Series(inst_stage, index=date_range)
+    n_inst     = (lb_stage == inst_s).sum()
+    pct_inst   = 100.0 * n_inst / n_total
+    hysteresis_days = int((expected_s != inst_s).sum())
+    print(f"  Instantaneous (no-hysteresis) match: {n_inst}/{n_total} ({pct_inst:.2f}%)")
+    print(f"  Days where hysteresis changes stage  : {hysteresis_days}")
 
     # --- LB MRF contributions: report over full run (informational) ---
     lb_mrf = pd.Series(ts(data["lower_basin_agg_mrf_trenton_step1"]), index=date_range)

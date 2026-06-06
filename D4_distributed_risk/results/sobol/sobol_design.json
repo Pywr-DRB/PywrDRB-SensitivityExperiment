@@ -1,0 +1,38 @@
+{
+  "num_vars": 6,
+  "names": [
+    "alpha_betz_warning",
+    "alpha_bm_warning",
+    "m_lb",
+    "tau_recovery",
+    "q_nj_warning",
+    "ierq_max_bg"
+  ],
+  "bounds": [
+    [
+      0.64,
+      0.84
+    ],
+    [
+      0.59,
+      0.79
+    ],
+    [
+      0.75,
+      1.25
+    ],
+    [
+      20,
+      45
+    ],
+    [
+      60.0,
+      80.0
+    ],
+    [
+      5.0,
+      7.5
+    ]
+  ],
+  "sample_scaled": true
+}

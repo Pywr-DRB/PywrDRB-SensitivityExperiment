@@ -1,0 +1,7 @@
+slr_id,slr_m,slr_ft,tfo_cfs,tfo_mgd,pct_above_baseline,source,status
+S0,0.0,0.0,3000,1938.95,0.0,pywrdrb mrf_baseline_delTrenton; Decree/FFMP normal,confirmed
+S1,0.3,0.984,3090,1997.12,0.03,DRBC Dec 2025 report scenario 1; proportional scaling pending PDF page,provisional
+S2,0.5,1.640,3180,2055.29,0.06,DRBC Dec 2025 report scenario 2; news release >0.5m stress,provisional
+S3,0.8,2.625,3300,2132.85,0.10,DRBC Dec 2025 report scenario 3,provisional
+S4,1.2,3.937,3450,2229.79,0.15,DRBC Dec 2025 report scenario 4,provisional
+S5,1.6,5.249,3600,2326.74,0.20,DRBC Dec 2025 report scenario 5 (upper bound),provisional

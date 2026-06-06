@@ -1,0 +1,13 @@
+constant,value,units,party,source,sobol_overridable
+TRENTON_MRF_BASELINE_MGD,1938.95,MGD,DE,pywrdrb constants.csv mrf_baseline_delTrenton,False
+MONTAGUE_MRF_BASELINE_MGD,1131.05,MGD,NY,pywrdrb constants.csv mrf_baseline_delMontague,False
+IERQ_EXHAUSTION_MG,500.0,MG,NYC,attribution.py,False
+NJ_NORMAL_CAP_MGD,100.0,MGD,NJ,§2.5.6.B.1,False
+NJ_WARNING_CAP_MGD,70.0,MGD,NJ,§2.5.6.C.1,PLACEHOLDER via q_nj_warning
+NJ_DROUGHT_CAP_MGD,65.0,MGD,NJ,§2.5.6.D.1,False
+LB_BELTZVILLE_CAPACITY_MG,13500.0,MG,PA,FFMP / pywrdrb ffmp.py,False
+LB_BLUEMARSH_CAPACITY_MG,7450.0,MG,PA,FFMP / pywrdrb ffmp.py,False
+LB_BELTZVILLE_WARNING_FRAC,0.737,fraction,PA,§2.5.6.C Water Code / ffmp.py default,IMPLEMENTED via alpha_betz_warning (model only — metrics.py still uses fixed value)
+LB_BLUEMARSH_WARNING_FRAC,0.689,fraction,PA,§2.5.6.C Water Code / ffmp.py default,IMPLEMENTED via alpha_bm_warning (model only — metrics.py still uses fixed value)
+LB_CONSERVATION_FRAC (combined),0.7199,fraction,PA,Derived: weighted avg of Betz+BM warning fracs,OPEN BUG — not updated when alpha params vary
+LB_CAPACITY_MG (combined),20950.0,MG,PA,run_d4_baseline.py LB_CAPACITY_MG,False

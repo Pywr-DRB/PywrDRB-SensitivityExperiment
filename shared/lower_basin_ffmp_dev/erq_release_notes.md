@@ -1,0 +1,1 @@
+../../notes/shared/erq_release_notes.md
